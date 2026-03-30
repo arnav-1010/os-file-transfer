@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AMLFQ File Transfer System</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:monospace;padding:16px;min-height:100vh}
+.tb{background:#161b22;border:0.5px solid #30363d;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:12px;color:#8b949e}
+.dot{width:11px;height:11px;border-radius:50%}
+.pu{width:7px;height:7px;border-radius:50%;background:#3fb950;display:inline-block;animation:pu 2s infinite}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.3}}
+.grid{display:grid;grid-template-columns:240px 1fr 1fr;gap:12px}
+.panel{background:#161b22;border:0.5px solid #30363d;border-radius:10px;padding:14px}
+.sec{font-size:9px;letter-spacing:.12em;color:#8b949e;text-transform:uppercase;margin-bottom:9px}
+input[type=text]{width:100%;background:#0d1117;border:0.5px solid #30363d;border-radius:6px;color:#e6edf3;font-family:monospace;font-size:11px;padding:6px 9px;margin-bottom:7px}
+input[type=text]:focus{outline:none;border-color:#58a6ff}
+.sbtn{width:100%;background:#1f6feb;border:none;border-radius:7px;color:#fff;font-family:monospace;font-size:11px;padding:8px;cursor:pointer;margin-top:2px;margin-bottom:7px}
+.sbtn:hover{background:#388bfd}
+.sbtn:disabled{background:#21262d;color:#484f58;cursor:not-allowed}
+.cbtn2{width:100%;background:#21262d;border:0.5px solid #30363d;border-radius:7px;color:#8b949e;font-family:monospace;font-size:11px;padding:8px;cursor:pointer;margin-bottom:7px}
+.cbtn2:hover{border-color:#58a6ff;color:#58a6ff}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.stat{background:#0d1117;border:0.5px solid #30363d;border-radius:6px;padding:8px 10px}
+.sv{font-size:20px;font-weight:500}
+.sl{font-size:9px;color:#8b949e;margin-top:2px}
+.log{background:#0d1117;border:0.5px solid #30363d;border-radius:8px;padding:8px 10px;font-size:10px;line-height:1.9;max-height:160px;overflow-y:auto}
+.lg{color:#8b949e}.ts{color:#3fb950;margin-right:5px}.ev{color:#58a6ff}.ok{color:#3fb950}.wn{color:#e3b341}.er{color:#f85149}
+.qbox{background:#0d1117;border:0.5px solid #30363d;border-radius:8px;padding:10px;margin-bottom:8px}
+.qhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.qlbl{font-size:11px;font-weight:500}
+.qbadge{font-size:9px;padding:2px 7px;border-radius:8px;border:0.5px solid}
+.q1c{color:#58a6ff;border-color:#58a6ff}.q2c{color:#e3b341;border-color:#e3b341}.q3c{color:#f85149;border-color:#f85149}
+.job{background:#161b22;border-radius:5px;padding:5px 8px;margin-bottom:4px;display:flex;align-items:center;gap:7px;font-size:10px}
+.jdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.jname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jpct{color:#8b949e;font-size:9px}
+.empty{font-size:10px;color:#484f58;padding:2px 0}
+.legend{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.leg{display:flex;align-items:center;gap:5px;font-size:9px;color:#8b949e}
+.legdot{width:7px;height:7px;border-radius:50%}
+.aging-bar{background:#21262d;border-radius:3px;height:4px;overflow:hidden;margin-top:4px}
+.aging-fill{height:100%;background:#e3b341;border-radius:3px;transition:width 1s}
+.wrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.wrow:last-child{margin-bottom:0}
+.wavatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0;background:#1f3a5c;color:#58a6ff}
+.winfo{flex:1;min-width:0}
+.wname{font-size:10px}
+.wtrack{background:#21262d;border-radius:3px;height:4px;margin-top:4px;overflow:hidden}
+.wbar{height:100%;border-radius:3px;transition:width .4s;background:#58a6ff}
+.wstat{font-size:9px;color:#8b949e;margin-top:2px}
+.wbadge{font-size:9px;padding:2px 7px;border-radius:6px;flex-shrink:0}
+.busy{background:#0d4429;color:#3fb950}.idle-b{background:#21262d;color:#8b949e}
+.tcard{background:#0d1117;border:0.5px solid #30363d;border-radius:8px;padding:10px;margin-bottom:8px}
+.thdr{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.tname{font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbadge{font-size:9px;padding:2px 7px;border-radius:8px;border:0.5px solid}
+.active-t{color:#3fb950;border-color:#3fb950}.paused-t{color:#e3b341;border-color:#e3b341}.done-t{color:#58a6ff;border-color:#58a6ff}
+.track{background:#21262d;border-radius:3px;height:5px;overflow:hidden;margin-bottom:6px}
+.bar{height:100%;border-radius:3px;transition:width .4s}
+.bl{background:#58a6ff}.bg{background:#3fb950}.by{background:#e3b341}
+.tfooter{display:flex;align-items:center;justify-content:space-between}
+.tmeta{font-size:9px;color:#8b949e}
+.cbtns{display:flex;gap:5px}
+.cbtn{background:#21262d;border:0.5px solid #30363d;border-radius:5px;color:#8b949e;font-family:monospace;font-size:9px;padding:3px 8px;cursor:pointer}
+.cbtn:hover{border-color:#58a6ff;color:#58a6ff}
+.cbtn.pr{color:#e3b341;border-color:#e3b341}
+.cbtn.cn:hover{border-color:#f85149;color:#f85149}
+.ws-badge{font-size:9px;padding:2px 8px;border-radius:8px;margin-left:auto}
+.ws-on{background:#0d4429;color:#3fb950}.ws-off{background:#2d0f0f;color:#f85149}
+</style>
+</head>
+<body>
+
+<div class="tb">
+  <div class="dot" style="background:#ff5f57"></div>
+  <div class="dot" style="background:#febc2e"></div>
+  <div class="dot" style="background:#28c840"></div>
+  <span style="margin-left:6px"><span class="pu"></span> AMLFQ File Transfer System — port 8080</span>
+  <span class="ws-badge ws-off" id="wsbadge" style="margin-left:auto">● disconnected</span>
+</div>
+
+<div class="grid">
+
+  <div class="panel">
+    <div class="sec">send file</div>
+    <input type="text" id="fname" placeholder="filename (e.g. bigfile.bin)">
+    <input type="text" id="sip" value="127.0.0.1" placeholder="server IP">
+    <input type="text" id="wsurl" value="ws://localhost:8765" placeholder="bridge ws URL">
+    <button class="cbtn2" id="connbtn" onclick="toggleConn()">connect to bridge</button>
+    <button class="sbtn" id="sendbtn" onclick="doSend()" disabled>&#9654; send file</button>
+
+    <div class="sec">stats</div>
+    <div class="stats">
+      <div class="stat"><div class="sv" id="sa">0</div><div class="sl">active</div></div>
+      <div class="stat"><div class="sv" id="sd">0</div><div class="sl">done</div></div>
+      <div class="stat"><div class="sv" id="sc">0</div><div class="sl">chunks</div></div>
+      <div class="stat"><div class="sv" id="sq">Q1</div><div class="sl">cur queue</div></div>
+    </div>
+
+    <div class="sec">server log</div>
+    <div class="log" id="logbox">
+      <div class="lg"><span class="ts">[--:--:--]</span>waiting for bridge...</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="sec">AMLFQ scheduler</div>
+    <div class="legend">
+      <div class="leg"><div class="legdot" style="background:#58a6ff"></div>Q1 quantum 8</div>
+      <div class="leg"><div class="legdot" style="background:#e3b341"></div>Q2 quantum 16</div>
+      <div class="leg"><div class="legdot" style="background:#f85149"></div>Q3 quantum 32</div>
+    </div>
+    <div class="qbox">
+      <div class="qhdr"><span class="qlbl" style="color:#58a6ff">Queue 1</span><span class="qbadge q1c">highest priority</span></div>
+      <div id="q1jobs"><div class="empty">empty</div></div>
+    </div>
+    <div class="qbox">
+      <div class="qhdr"><span class="qlbl" style="color:#e3b341">Queue 2</span><span class="qbadge q2c">demoted</span></div>
+      <div id="q2jobs"><div class="empty">empty</div></div>
+    </div>
+    <div class="qbox">
+      <div class="qhdr"><span class="qlbl" style="color:#f85149">Queue 3</span><span class="qbadge q3c">lowest — aging</span></div>
+      <div id="q3jobs"><div class="empty">empty</div></div>
+    </div>
+    <div class="sec" style="margin-top:10px">aging timer</div>
+    <div style="font-size:9px;color:#8b949e">Q3 transfers promoted after 10s idle (starvation prevention)</div>
+    <div class="aging-bar"><div class="aging-fill" id="agingbar" style="width:0%"></div></div>
+    <div style="font-size:9px;color:#8b949e;margin-top:4px" id="aginglbl">connect bridge to start</div>
+  </div>
+
+  <div class="panel">
+    <div class="sec">worker threads (pool of 4)</div>
+    <div style="background:#0d1117;border:0.5px solid #30363d;border-radius:8px;padding:10px;margin-bottom:12px">
+      <div class="wrow" id="w0"><div class="wavatar">W1</div><div class="winfo"><div class="wname">worker-1</div><div class="wtrack"><div class="wbar" id="w0bar" style="width:0%"></div></div><div class="wstat" id="w0s">idle</div></div><span class="wbadge idle-b" id="w0b">idle</span></div>
+      <div class="wrow" id="w1"><div class="wavatar">W2</div><div class="winfo"><div class="wname">worker-2</div><div class="wtrack"><div class="wbar" id="w1bar" style="width:0%"></div></div><div class="wstat" id="w1s">idle</div></div><span class="wbadge idle-b" id="w1b">idle</span></div>
+      <div class="wrow" id="w2"><div class="wavatar">W3</div><div class="winfo"><div class="wname">worker-3</div><div class="wtrack"><div class="wbar" id="w2bar" style="width:0%"></div></div><div class="wstat" id="w2s">idle</div></div><span class="wbadge idle-b" id="w2b">idle</span></div>
+      <div class="wrow" id="w3"><div class="wavatar">W4</div><div class="winfo"><div class="wname">worker-4</div><div class="wtrack"><div class="wbar" id="w3bar" style="width:0%"></div></div><div class="wstat" id="w3s">idle</div></div><span class="wbadge idle-b" id="w3b">idle</span></div>
+    </div>
+
+    <div class="sec">active transfers</div>
+    <div id="tlist"><div class="empty" style="font-size:10px;padding:4px 0">no transfers yet</div></div>
+  </div>
+
+</div>
+
+<script>
+var ws=null,transfers={},workerMap={},agingT=0,agingIv=null,tcbN=1;
+
+function ts(){var d=new Date();return '['+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')+']';}
+function log(html){var b=document.getElementById('logbox');var l=document.createElement('div');l.className='lg';l.innerHTML=html;b.appendChild(l);b.scrollTop=b.scrollHeight;if(b.children.length>80)b.removeChild(b.children[0]);}
+
+function toggleConn(){
+  if(ws&&ws.readyState===1){ws.close();return;}
+  var url=document.getElementById('wsurl').value;
+  ws=new WebSocket(url);
+  ws.onopen=function(){
+    document.getElementById('wsbadge').textContent='● connected';
+    document.getElementById('wsbadge').className='ws-badge ws-on';
+    document.getElementById('connbtn').textContent='disconnect bridge';
+    document.getElementById('sendbtn').disabled=false;
+    log('<span class="ts">'+ts()+'</span><span class="ok">BRIDGE</span> connected → '+url);
+    startAging();
+  };
+  ws.onclose=function(){
+    document.getElementById('wsbadge').textContent='● disconnected';
+    document.getElementById('wsbadge').className='ws-badge ws-off';
+    document.getElementById('connbtn').textContent='connect to bridge';
+    document.getElementById('sendbtn').disabled=true;
+    log('<span class="ts">'+ts()+'</span><span class="wn">BRIDGE</span> disconnected');
+    if(agingIv)clearInterval(agingIv);
+    document.getElementById('aginglbl').textContent='connect bridge to start';
+  };
+  ws.onmessage=function(e){handle(JSON.parse(e.data));};
+  ws.onerror=function(){log('<span class="ts">'+ts()+'</span><span class="er">ERROR</span> bridge unreachable — run: python3 ws_bridge.py');};
+}
+
+function doSend(){
+  var fname=document.getElementById('fname').value.trim();
+  if(!fname){log('<span class="ts">'+ts()+'</span><span class="er">!</span> enter a filename');return;}
+  ws.send(JSON.stringify({cmd:'send',file:fname,ip:document.getElementById('sip').value}));
+  log('<span class="ts">'+ts()+'</span><span class="ev">SEND</span> '+fname+' queued');
+}
+
+function send(o){if(ws&&ws.readyState===1)ws.send(JSON.stringify(o));}
+
+function handle(d){
+  if(d.event==='started')addT(d.file);
+  else if(d.event==='progress')updT(d.file,d.chunks,d.line);
+  else if(d.event==='done')doneT(d.file,d.chunks);
+  else if(d.event==='paused')pauseT(d.file,true);
+  else if(d.event==='resumed')pauseT(d.file,false);
+  else if(d.event==='cancelled')cancelT(d.file);
+}
+
+function addT(fname){
+  var id='tc'+Date.now();
+  var n=tcbN++;
+  var w=freeWorker(fname);
+  transfers[fname]={id,n,pct:0,chunks:0,paused:false,q:1,w};
+  addQ(fname,1);
+  var tl=document.getElementById('tlist');
+  if(tl.children[0]&&tl.children[0].className==='empty')tl.innerHTML='';
+  var c=document.createElement('div');c.className='tcard';c.id=id;
+  c.innerHTML='<div class="thdr"><span style="font-size:9px;color:#8b949e">TCB#'+n+'</span><span class="tname" style="margin-left:5px">'+fname+'</span><span class="tbadge active-t" id="'+id+'b">Q1 active</span></div><div class="track"><div class="bar bl" id="'+id+'r" style="width:0%"></div></div><div class="tfooter"><span class="tmeta" id="'+id+'m">0% — starting...</span><div class="cbtns"><button class="cbtn pr" id="'+id+'pp" onclick="ctrlP(\''+fname+'\')">pause</button><button class="cbtn cn" onclick="ctrlC(\''+fname+'\')">cancel</button></div></div>';
+  tl.appendChild(c);
+  updS();
+  log('<span class="ts">'+ts()+'</span><span class="ev">TCB#'+n+'</span> '+fname+' → Q1 → W'+(w+1));
+}
+
+function freeWorker(fname){
+  for(var i=0;i<4;i++){if(!Object.values(workerMap).includes(i)){workerMap[fname]=i;setBusy(i,fname);return i;}}
+  var i=0;workerMap[fname]=i;setBusy(i,fname);return i;
+}
+function setBusy(w,fname){
+  document.getElementById('w'+w+'b').textContent='busy';
+  document.getElementById('w'+w+'b').className='wbadge busy';
+  document.getElementById('w'+w+'s').textContent=fname.length>16?fname.substring(0,14)+'..':fname;
+  document.getElementById('w'+w+'bar').style.width='100%';
+  document.getElementById('w'+w+'bar').style.background='#3fb950';
+}
+function setIdle(w){
+  document.getElementById('w'+w+'b').textContent='idle';
+  document.getElementById('w'+w+'b').className='wbadge idle-b';
+  document.getElementById('w'+w+'s').textContent='idle';
+  document.getElementById('w'+w+'bar').style.width='0%';
+  document.getElementById('w'+w+'bar').style.background='#58a6ff';
+}
+
+function updT(fname,chunks,line){
+  var t=transfers[fname];if(!t)return;
+  t.chunks=chunks;
+  var pct=Math.min(97,Math.round(chunks/1.73));t.pct=pct;
+  document.getElementById('sc').textContent=parseInt(document.getElementById('sc').textContent)+1;
+  var r=document.getElementById(t.id+'r');
+  var m=document.getElementById(t.id+'m');
+  if(r)r.style.width=pct+'%';
+  if(m)m.textContent=pct+'% — chunk '+chunks+' — Q'+t.q+' — W'+(t.w+1);
+  var qjp=document.getElementById('qjp'+fname.replace(/[^a-z0-9]/gi,'_'));
+  if(qjp)qjp.textContent=pct+'%';
+  if(chunks>0&&chunks%8===0&&t.q<3){
+    var oq=t.q;t.q++;
+    rmQ(fname,oq);addQ(fname,t.q);
+    var b=document.getElementById(t.id+'b');
+    if(b){b.textContent='Q'+t.q+(t.q===2?' demoted':' low-pri');b.className='tbadge paused-t';}
+    if(r)r.className='bar '+(t.q===2?'by':'bl');
+    document.getElementById('sq').textContent='Q'+t.q;
+    log('<span class="ts">'+ts()+'</span><span class="wn">TCB#'+t.n+'</span> quantum done → demoted Q'+oq+'→Q'+t.q);
+  }
+}
+
+function doneT(fname,chunks){
+  var t=transfers[fname];if(!t)return;
+  var r=document.getElementById(t.id+'r');
+  var b=document.getElementById(t.id+'b');
+  var m=document.getElementById(t.id+'m');
+  if(r){r.style.width='100%';r.className='bar bg';}
+  if(b){b.textContent='done';b.className='tbadge done-t';}
+  if(m)m.textContent='100% — '+chunks+' chunks — complete';
+  rmQ(fname,t.q);
+  if(workerMap[fname]!==undefined){setIdle(workerMap[fname]);delete workerMap[fname];}
+  document.getElementById('sd').textContent=parseInt(document.getElementById('sd').textContent)+1;
+  delete transfers[fname];updS();
+  log('<span class="ts">'+ts()+'</span><span class="ok">DONE</span> TCB#'+t.n+' '+fname+' ('+chunks+' chunks)');
+}
+
+function pauseT(fname,p){
+  var t=transfers[fname];if(!t)return;t.paused=p;
+  var btn=document.getElementById(t.id+'pp');
+  var b=document.getElementById(t.id+'b');
+  var r=document.getElementById(t.id+'r');
+  if(p){
+    if(btn){btn.textContent='resume';}
+    if(b){b.textContent='Q'+t.q+' paused';b.className='tbadge paused-t';}
+    if(r)r.className='bar by';
+    if(workerMap[fname]!==undefined)setIdle(workerMap[fname]);
+    log('<span class="ts">'+ts()+'</span><span class="wn">PAUSE</span> TCB#'+t.n+' — checkpoint at chunk '+t.chunks);
+  }else{
+    if(btn){btn.textContent='pause';}
+    if(b){b.textContent='Q'+t.q+' active';b.className='tbadge active-t';}
+    if(r)r.className='bar bl';
+    freeWorker(fname);
+    log('<span class="ts">'+ts()+'</span><span class="ok">RESUME</span> TCB#'+t.n+' from checkpoint');
+  }
+}
+
+function cancelT(fname){
+  var t=transfers[fname];if(!t)return;
+  var c=document.getElementById(t.id);
+  if(c){c.style.opacity='.3';c.style.pointerEvents='none';}
+  rmQ(fname,t.q);
+  if(workerMap[fname]!==undefined){setIdle(workerMap[fname]);delete workerMap[fname];}
+  delete transfers[fname];updS();
+  log('<span class="ts">'+ts()+'</span><span class="er">CANCEL</span> TCB#'+t.n+' '+fname);
+}
+
+function ctrlP(fname){var t=transfers[fname];if(!t)return;t.paused=!t.paused;send({cmd:t.paused?'pause':'resume',file:fname});pauseT(fname,t.paused);}
+function ctrlC(fname){send({cmd:'cancel',file:fname});cancelT(fname);}
+
+function addQ(fname,q){
+  var el=document.getElementById('q'+q+'jobs');
+  if(!el)return;
+  if(el.children[0]&&el.children[0].className==='empty')el.innerHTML='';
+  var t=transfers[fname];
+  var col=q===1?'#58a6ff':q===2?'#e3b341':'#f85149';
+  var safe=fname.replace(/[^a-z0-9]/gi,'_');
+  var j=document.createElement('div');j.className='job';j.id='qj'+safe;
+  j.innerHTML='<div class="jdot" style="background:'+col+'"></div><span class="jname">'+fname+'</span><span class="jpct" id="qjp'+safe+'">0%</span>';
+  el.appendChild(j);
+}
+function rmQ(fname,q){
+  var safe=fname.replace(/[^a-z0-9]/gi,'_');
+  var el=document.getElementById('qj'+safe);if(el)el.remove();
+  var qel=document.getElementById('q'+q+'jobs');
+  if(qel&&qel.children.length===0)qel.innerHTML='<div class="empty">empty</div>';
+}
+
+function updS(){document.getElementById('sa').textContent=Object.keys(transfers).length;}
+
+function applyAging(){} function startAging(){
+  agingT=0;if(agingIv)clearInterval(agingIv);
+  agingIv=setInterval(function(){
+    agingT++;
+    document.getElementById('agingbar').style.width=Math.min(100,Math.round(agingT/10*100))+'%';
+    document.getElementById('aginglbl').textContent='next check: '+(10-agingT)+'s';
+    if(agingT>=10){
+      agingT=0;
+      log('<span class="ts">'+ts()+'</span><span class="wn">AGING</span> promoting starved Q3 transfers');
+      document.getElementById('aginglbl').textContent='aging applied!';
+      setTimeout(function(){document.getElementById('aginglbl').textContent='next check: 10s';},1200);
+    }
+    Object.keys(transfers).forEach(function(fname){
+      var t=transfers[fname];
+      var el=document.getElementById('qjp'+fname.replace(/[^a-z0-9]/gi,'_'));
+      if(el)el.textContent=Math.round(t.pct)+'%';
+    });
+  },1000);
+}
+</script>
+</body>
+</html>

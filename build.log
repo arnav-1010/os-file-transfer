@@ -1,0 +1,2 @@
+g++ -std=c++17 -pthread src/server.cpp src/thread_pool.cpp src/scheduler.cpp src/checkpoint.cpp -o server -lssl -lcrypto
+g++ -std=c++17 -pthread src/client.cpp -o client -lssl -lcrypto

@@ -1,0 +1,83 @@
+[ThreadPool] Starting 4 worker threads
+=== SERVER STARTED (AMLFQ Mode) ===
+Workers  : 4
+Port     : 8080
+Queues   : 3 (quanta: 8 / 16 / 32 chunks)
+Waiting for clients...
+
+[Server] New client accepted (fd=4)
+[TCB #1] Transfer started: small.txt (Q1)
+[TCB #1] Chunk 1 (18 bytes, Q1)
+[Checkpoint] Deleted checkpoint for TCB #1
+[TCB #1] COMPLETED: small.txt
+  Chunks : 1
+  Bytes  : 18
+  Time   : 0.309905s
+  Speed  : 0.0567211 KB/s
+[Server] New client accepted (fd=5)
+[TCB #2] Transfer started: medium.bin (Q1)
+[TCB #2] Chunk 1 (4096 bytes, Q1)
+[TCB #2] Chunk 2 (4159 bytes, Q1)
+[TCB #2] Chunk 3 (4159 bytes, Q1)
+[TCB #2] Chunk 4 (4159 bytes, Q1)
+[TCB #2] Chunk 5 (4159 bytes, Q1)
+[TCB #2] Chunk 6 (4159 bytes, Q1)
+[TCB #2] Chunk 7 (4159 bytes, Q1)
+[TCB #2] Chunk 8 (4159 bytes, Q1)
+[Checkpoint] Saved TCB #2 at offset 33209
+[AMLFQ] TCB #2 demoted to Queue 2
+[TCB #2] Quantum exhausted → demoted to Q2, checkpointed
+[TCB #2] Chunk 9 (4159 bytes, Q2)
+[TCB #2] Chunk 10 (4159 bytes, Q2)
+[TCB #2] Chunk 11 (4159 bytes, Q2)
+[TCB #2] Chunk 12 (4159 bytes, Q2)
+[TCB #2] Chunk 13 (1355 bytes, Q2)
+[Checkpoint] Deleted checkpoint for TCB #2
+[TCB #2] COMPLETED: medium.bin
+  Chunks : 13
+  Bytes  : 51200
+  Time   : 0.30813s
+  Speed  : 162.269 KB/s
+[Server] New client accepted (fd=4)
+[TCB #3] Transfer started: small.txt (Q1)
+[TCB #3] Chunk 1 (18 bytes, Q1)
+[Checkpoint] Deleted checkpoint for TCB #3
+[TCB #3] COMPLETED: small.txt
+  Chunks : 1
+  Bytes  : 18
+  Time   : 0.309738s
+  Speed  : 0.0567515 KB/s
+[ThreadPool] Starting 4 worker threads
+=== SERVER STARTED (AMLFQ Mode) ===
+Workers  : 4
+Port     : 8080
+Queues   : 3 (quanta: 8 / 16 / 32 chunks)
+Waiting for clients...
+
+[Server] New client accepted (fd=4)
+[TCB #1] Transfer started: small.txt (Q1)
+[TCB #1] Chunk 1 (18 bytes, Q1)
+[Checkpoint] Deleted checkpoint for TCB #1
+[TCB #1] COMPLETED: small.txt
+  Chunks : 1
+  Bytes  : 18
+  Time   : 0.306399s
+  Speed  : 0.05737 KB/s
+[Server] New client accepted (fd=5)
+[TCB #2] Transfer started: small.txt (Q1)
+[TCB #2] Chunk 1 (18 bytes, Q1)
+[Checkpoint] Deleted checkpoint for TCB #2
+[TCB #2] COMPLETED: small.txt
+  Chunks : 1
+  Bytes  : 18
+  Time   : 0.307312s
+  Speed  : 0.0571996 KB/s
+[Server] New client accepted (fd=4)
+[TCB #3] Transfer started: small.txt (Q1)
+[TCB #3] Chunk 1 (18 bytes, Q1)
+[Checkpoint] Deleted checkpoint for TCB #3
+[TCB #3] COMPLETED: small.txt
+  Chunks : 1
+  Bytes  : 18
+  Time   : 0.307446s
+  Speed  : 0.0571747 KB/s
