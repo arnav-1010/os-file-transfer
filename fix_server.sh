@@ -1,3 +1,6 @@
+#!/bin/bash
+# Writes the fixed server.cpp directly to ~/file_transfer_project/src/server.cpp
+cat > ~/file_transfer_project/src/server.cpp << 'SERVEREOF'
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -205,3 +208,12 @@ int main() {
     close(server_fd);
     return 0;
 }
+SERVEREOF
+
+echo "--- Written. Verifying ---"
+grep -n "g_chunk_buf\|sync_buffer\|disk_io_start\|NUM_WORKERS 8\|produce" \
+     ~/file_transfer_project/src/server.cpp
+
+echo ""
+echo "--- Rebuilding ---"
+cd ~/file_transfer_project && make clean && make
