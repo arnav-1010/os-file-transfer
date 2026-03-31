@@ -1,3 +1,6 @@
+// ============================================================
+// server.cpp — Weeks 1-5: TCP + ThreadPool + AMLFQ + SyncBuffer + AES + SHA256
+// ============================================================
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -13,22 +16,20 @@
 #include "../include/scheduler.h"
 #include "../include/checkpoint.h"
 #include "../include/sync_buffer.h"
+#include "../include/crypto.h"
 
 #define PORT         8080
 #define CHUNK_SIZE   4096
-#define END_SIGNAL   "END_OF_FILE"
-#define PAUSE_SIGNAL "PAUSE_TRANSFER"
 #define NUM_WORKERS  8
 
-std::atomic<int> next_file_id(1);
-AMFLQScheduler   scheduler;
-
-SyncBuffer   g_chunk_buf(BUFFER_CAPACITY);
-DiskIOThread g_disk_io;
+std::atomic<int>  next_file_id(1);
+AMFLQScheduler    scheduler;
+SyncBuffer        g_chunk_buf(BUFFER_CAPACITY);
+DiskIOThread      g_disk_io;
 
 void handle_client(int client_fd) {
     char filename[256] = {0};
-    int n = recv(client_fd, filename, sizeof(filename) - 1, 0);
+    int n = recv(client_fd, filename, sizeof(filename)-1, 0);
     if (n <= 0) { close(client_fd); return; }
     std::string fname(filename);
 
@@ -42,108 +43,101 @@ void handle_client(int client_fd) {
               << fname << " (Q" << tcb->priority_level << ")\n";
     std::cout.flush();
 
-    if (tcb->current_offset == 0) {
-        mkdir("received_files", 0777);
-        std::string filepath = "received_files/" + fname;
-        std::ofstream trunc_file(filepath, std::ios::binary | std::ios::trunc);
-        if (!trunc_file) {
-            std::cerr << "[TCB #" << tcb->file_id
-                      << "] Cannot create output file: " << filepath << "\n";
-            close(client_fd);
-            return;
-        }
-        trunc_file.close();
-    }
-
-    char buffer[CHUNK_SIZE + 64];
-    int  chunks_this_quantum = 0;
-    int  quantum = QUEUE_QUANTUM[tcb->priority_level - 1];
+    int chunks_this_quantum = 0;
+    int quantum = QUEUE_QUANTUM[tcb->priority_level - 1];
 
     while (true) {
-        memset(buffer, 0, sizeof(buffer));
-        int bytes = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-
-        if (bytes <= 0) {
-            std::cout << "[TCB #" << tcb->file_id
-                      << "] Client disconnected at chunk "
-                      << tcb->last_chunk_received << " — checkpoint saved\n";
+        uint32_t frame_len_net = 0;
+        int r = recv(client_fd, &frame_len_net, 4, MSG_WAITALL);
+        if (r <= 0) {
+            std::cout << "[TCB #" << fid << "] Client disconnected — checkpoint saved\n";
             std::cout.flush();
             save_checkpoint(*tcb);
-            ChunkEntry eof_entry;
-            strncpy(eof_entry.filename, fname.c_str(), sizeof(eof_entry.filename) - 1);
-            eof_entry.file_id = tcb->file_id; eof_entry.seq_num = tcb->last_chunk_received;
-            eof_entry.data_len = 0; eof_entry.is_eof = true;
-            g_chunk_buf.produce(eof_entry);
             break;
         }
+        uint32_t frame_len = ntohl(frame_len_net);
 
-        if (bytes == (int)strlen(END_SIGNAL) &&
-            memcmp(buffer, END_SIGNAL, strlen(END_SIGNAL)) == 0) {
+        if (frame_len == 0xFFFFFFFF) {
             tcb->status = TransferStatus::COMPLETED;
             delete_checkpoint(tcb->file_id);
             auto end = std::chrono::steady_clock::now();
             double s = std::chrono::duration<double>(end - tcb->start_time).count();
             if (s <= 0) s = 0.001;
-            std::cout << "[TCB #" << tcb->file_id << "] COMPLETED: " << fname << "\n"
+            std::cout << "[TCB #" << fid << "] COMPLETED: " << fname << "\n"
                       << "  Chunks : " << tcb->last_chunk_received << "\n"
-                      << "  Bytes  : " << tcb->current_offset << "\n"
+                      << "  Bytes  : " << tcb->current_offset      << "\n"
                       << "  Time   : " << s << "s\n"
-                      << "  Speed  : " << (tcb->current_offset / 1024.0 / s) << " KB/s\n";
+                      << "  Speed  : " << (tcb->current_offset/1024.0/s) << " KB/s\n";
             std::cout.flush();
-            ChunkEntry eof_entry;
-            strncpy(eof_entry.filename, fname.c_str(), sizeof(eof_entry.filename) - 1);
-            eof_entry.file_id = tcb->file_id; eof_entry.seq_num = tcb->last_chunk_received;
-            eof_entry.data_len = 0; eof_entry.is_eof = true;
-            g_chunk_buf.produce(eof_entry);
             break;
         }
 
-        if (bytes == (int)strlen(PAUSE_SIGNAL) &&
-            memcmp(buffer, PAUSE_SIGNAL, strlen(PAUSE_SIGNAL)) == 0) {
-            tcb->status = TransferStatus::PAUSED;
-            save_checkpoint(*tcb);
-            std::cout << "[TCB #" << tcb->file_id << "] PAUSED at chunk "
-                      << tcb->last_chunk_received << "\n";
-            std::cout.flush();
-            ChunkEntry eof_entry;
-            strncpy(eof_entry.filename, fname.c_str(), sizeof(eof_entry.filename) - 1);
-            eof_entry.file_id = tcb->file_id; eof_entry.seq_num = tcb->last_chunk_received;
-            eof_entry.data_len = 0; eof_entry.is_eof = true;
-            g_chunk_buf.produce(eof_entry);
-            break;
+        if (frame_len > MAX_CHUNK_BYTES + CRYPTO_HDR + 64) {
+            std::cerr << "[TCB #" << fid << "] Frame too large\n";
+            save_checkpoint(*tcb); break;
         }
 
-        tcb->current_offset      += bytes;
+        uint8_t enc_buf[MAX_CHUNK_BYTES + CRYPTO_HDR + 64];
+        int got = recv(client_fd, enc_buf, frame_len, MSG_WAITALL);
+        if (got != (int)frame_len) {
+            std::cerr << "[TCB #" << fid << "] Incomplete frame\n";
+            save_checkpoint(*tcb); break;
+        }
+
+        uint8_t plain_buf[MAX_CHUNK_BYTES];
+        int plain_len = crypto_decrypt(enc_buf, frame_len, plain_buf, sizeof(plain_buf));
+
+        if (plain_len == -2) {
+            std::cerr << "[TCB #" << fid << "] SHA-256 MISMATCH on chunk "
+                      << tcb->last_chunk_received + 1 << "\n";
+            std::cout.flush();
+        } else if (plain_len < 0) {
+            std::cerr << "[TCB #" << fid << "] Decrypt error\n";
+            save_checkpoint(*tcb); break;
+        }
+
+        std::string hex = hash_to_hex(enc_buf + IV_SIZE);
+
         tcb->last_chunk_received++;
+        tcb->current_offset += plain_len;
         chunks_this_quantum++;
 
-        ChunkEntry entry;
-        strncpy(entry.filename, fname.c_str(), sizeof(entry.filename) - 1);
-        entry.file_id  = tcb->file_id;
-        entry.seq_num  = tcb->last_chunk_received;
-        entry.data_len = static_cast<size_t>(bytes);
-        entry.is_eof   = false;
-        memcpy(entry.data, buffer, bytes);
-        g_chunk_buf.produce(entry);
-
-        std::cout << "[TCB #" << tcb->file_id << "] Chunk "
-                  << tcb->last_chunk_received
-                  << " (" << bytes << " bytes, Q" << tcb->priority_level
-                  << ") queued for disk\n";
+        std::cout << "[TCB #" << fid << "] Chunk " << tcb->last_chunk_received
+                  << " OK (" << plain_len << "B)"
+                  << " sha256=" << hex.substr(0,16) << "..."
+                  << (plain_len >= 0 ? " [OK]" : " [HASH MISMATCH!]") << "\n";
         std::cout.flush();
+
+        ChunkEntry entry;
+        strncpy(entry.filename, fname.c_str(), sizeof(entry.filename)-1);
+        entry.filename[sizeof(entry.filename)-1] = '\0';
+        entry.file_id  = fid;
+        entry.seq_num  = tcb->last_chunk_received;
+        entry.data_len = (plain_len > 0) ? (size_t)plain_len : 0;
+        entry.is_eof   = false;
+        if (entry.data_len > 0)
+            memcpy(entry.data, plain_buf, entry.data_len);
+        g_chunk_buf.produce(entry);
 
         if (chunks_this_quantum >= quantum) {
             save_checkpoint(*tcb);
             scheduler.requeue(tcb, true);
-            std::cout << "[TCB #" << tcb->file_id
-                      << "] Quantum exhausted → demoted to Q"
-                      << tcb->priority_level << ", checkpointed\n";
+            std::cout << "[TCB #" << fid << "] Quantum exhausted → Q"
+                      << tcb->priority_level << "\n";
             std::cout.flush();
             chunks_this_quantum = 0;
             quantum = QUEUE_QUANTUM[tcb->priority_level - 1];
             tcb->last_scheduled = std::chrono::steady_clock::now();
         }
     }
+
+    ChunkEntry eof_entry;
+    strncpy(eof_entry.filename, fname.c_str(), sizeof(eof_entry.filename)-1);
+    eof_entry.file_id  = fid;
+    eof_entry.seq_num  = 0;
+    eof_entry.data_len = 0;
+    eof_entry.is_eof   = true;
+    g_chunk_buf.produce(eof_entry);
 
     close(client_fd);
 }
@@ -170,38 +164,32 @@ int main() {
     address.sin_port        = htons(PORT);
 
     if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        std::cerr << "Bind failed — is port " << PORT << " already in use?\n";
-        return 1;
+        std::cerr << "Bind failed\n"; return 1;
     }
     listen(server_fd, 10);
 
-    if (disk_io_start(g_disk_io, g_chunk_buf, "received_files") != 0) {
-        std::cerr << "FATAL: could not start DiskIO thread\n";
-        return 1;
-    }
+    mkdir("received_files", 0777);
+    disk_io_start(g_disk_io, g_chunk_buf, "received_files");
 
     ThreadPool pool(NUM_WORKERS);
     std::thread ager(aging_thread);
     ager.detach();
 
-    std::cout << "=== SERVER STARTED (Week 4 — Sync Integration) ===\n"
-              << "Workers  : " << NUM_WORKERS    << "\n"
-              << "Port     : " << PORT            << "\n"
-              << "Buffer   : " << BUFFER_CAPACITY << " slots\n"
-              << "Queues   : " << NUM_QUEUES
-              << " (quanta: 8 / 16 / 32 chunks)\n"
+    std::cout << "=== SERVER STARTED (Weeks 1-5) ===\n"
+              << "Workers : " << NUM_WORKERS << "\n"
+              << "Port    : " << PORT << "\n"
+              << "AES-128-CBC + SHA-256 enabled\n"
               << "Waiting for clients...\n\n";
     std::cout.flush();
 
     while (true) {
         int client_fd = accept(server_fd, (struct sockaddr*)&address, &addrlen);
         if (client_fd < 0) continue;
-        std::cout << "[Server] New client (fd=" << client_fd << ")\n";
+        std::cout << "[Server] Client accepted (fd=" << client_fd << ")\n";
         std::cout.flush();
         pool.enqueue([client_fd]() { handle_client(client_fd); });
     }
 
-    disk_io_stop(g_disk_io);
     close(server_fd);
     return 0;
 }
